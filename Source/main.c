@@ -49,7 +49,7 @@ const uint16_t LONG_PRESS_TIME = 2; // 3 seconds holding for long press.
 const float MIN_PRESS_TIME = 0.05; // the min single press should need 0.05 second.
 const float DOUBLE_CLICK_TIME = 0.5; // double press should be with in 0.5 second.
 const uint16_t IDLE_TIME = 5;
-const int SOUND_OUTPUT = 1; // output the sound for 1 second
+const float SOUND_OUTPUT = 0.3; // output the sound for 1 second
 
 // used to help calculate the time interval for some event
 unsigned int timer_for_button_hold = 0;
@@ -284,6 +284,7 @@ void UpdateTimingStatus() {
 	
 	if (is_single_click && !within_double_click_period) {
 		new_num_click++;
+		output_sound = true;
 		is_single_click = false;
 	} else if (is_double_click) {
 		// do nothing for now
@@ -297,6 +298,8 @@ void UpdateTimingStatus() {
 
 		if(new_num_click)
 			UpdateIngredientTiming();
+		
+		output_sound = true;
 	}
 }
 
@@ -614,6 +617,8 @@ int main(void)
 
 void vButtonTask(void *pvParameters)
 {
+	mode preMode = curMode;
+	bool ChangeMode = false;
 	while(1) {
 		uint8_t button_pin = GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0);
 		uint32_t *curValvePos = (uint32_t *) pvParameters;
@@ -624,14 +629,27 @@ void vButtonTask(void *pvParameters)
       is_button_up = false;
 			// reset the timer for idle when button event happened
 			timer_for_idle = 0;
+			if(curMode != making || curMode != neutral || preMode != making || preMode != neutral)
+			{
+				ChangeMode = ChangeMode || (preMode != curMode);
+			} else
+			{
+				ChangeMode = false;
+			}
+			preMode = curMode;
+			if(curMode == making || curMode == neutral || preMode == making || preMode == neutral)
+			{
+				ChangeMode = false;
+			}
     } else {
       if (CanUpdateClickState()) {
-				if (!is_single_click && !is_double_click) {
+				if (!is_single_click && !is_double_click && !ChangeMode) {
 					is_single_click = true;
 				} else if (is_single_click && !is_double_click) {
 					is_single_click = false;
 					is_double_click = true;
 				}
+				ChangeMode = false;
       }
 			if(!is_button_up) 
 			{
@@ -715,6 +733,10 @@ void vDispenseLatte(void *pvParameters) {
 			timer_for_idle = 0;
 			milk--;
 		}
+		
+		output_sound = true;
+		vTaskDelay(500/portTICK_RATE_MS);
+		output_sound = true;
 			
 		vTaskDelete(NULL);
 	}
@@ -761,6 +783,10 @@ void vDispenseMocha(void *pvParameters) {
 			choc--;
 		}
 		
+		output_sound = true;
+		vTaskDelay(500/portTICK_RATE_MS);
+		output_sound = true;
+		
 		vTaskDelete(NULL);
 	}
 }
@@ -788,6 +814,10 @@ void vDispenseEspresso(void *pvParameters) {
 			espresso--;
 		}
 			
+		
+		output_sound = true;
+		vTaskDelay(500/portTICK_RATE_MS);
+		output_sound = true;
 		vTaskDelete(NULL);
 	}
 }
